@@ -21,16 +21,11 @@ const app = express();
 // ------------------------------
 // CORS CONFIG (IMPORTANT FOR HOSTING)
 // ------------------------------
-app.use(
-  cors({
-    origin: [
-      "http://localhost:5173",
-      "https://moneymap-frontend.onrender.com",
-      "https://customdom.com"
-    ],
-    credentials: true,
-  })
-);
+app.use(cors({
+  origin: ["http://localhost:5173", "https://your-frontend.netlify.app"],
+  credentials: true
+}));
+
 
 // ------------------------------
 // MIDDLEWARE
