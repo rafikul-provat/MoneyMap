@@ -25,7 +25,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
-      "https://dainty-gumdrop-19b227.netlify.app",  
+      "https://moneymap-frontend-emut.onrender.com",  
     ],
     credentials: true,
   })
