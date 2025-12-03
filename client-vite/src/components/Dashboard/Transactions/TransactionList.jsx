@@ -1,164 +1,136 @@
-// client/src/components/Dashboard/Dashboard.js
-import React, { useState, useEffect, useCallback } from "react";
-import Sidebar from "../Sidebar";
-import Modal from "../Modal";
-import SummaryBox from "./Summary/SummaryBox";
-import AddTransactionForm from "./Transactions/AddTransactionForm";
-import TransactionList from "./Transactions/TransactionList";
-import IncomeChart from "./Charts/IncomeChart";
-import ExpenseChart from "./Charts/ExpenseChart";
-import SavingsChart from "./Charts/SavingsChart";
-import MonthlyChart from "./Charts/MonthlyChart";
-import "./Dashboard.css";
+import React from "react";
 import api from "@/api/axiosConfig";
 
-const Dashboard = ({ username, onLogout }) => {
-  const [transactions, setTransactions] = useState([]);
-  const [monthlyData, setMonthlyData] = useState({});
-
-  const [incomeModal, setIncomeModal] = useState(false);
-  const [expenseModal, setExpenseModal] = useState(false);
-
+const TransactionList = ({ transactions, onDelete }) => {
   const token = localStorage.getItem("token");
-  const userId = localStorage.getItem("userId"); // must be real ObjectId
 
-  // --------------------------------
-  // LOAD ALL TRANSACTIONS
-  // --------------------------------
-  const loadTx = useCallback(async () => {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = String(now.getMonth() + 1).padStart(2, "0");
+
+  const thisMonthKey = `${currentYear}-${currentMonth}`;
+  const thisMonthTx = transactions.filter((t) => t.date?.startsWith(thisMonthKey));
+
+  const recent = thisMonthTx.slice(0, 5);
+
+  // 🔥 DELETE FUNCTION
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this transaction?")) return;
+
     try {
-      const res = await api.get(`/transactions/${userId}`);
+      await api.delete(`/transactions/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-
-
-      setTransactions(res.data);
+      onDelete(id); // update UI in Dashboard
     } catch (err) {
-      console.error("Transaction load error:", err);
+      console.error("Delete failed:", err);
+      alert("Failed to delete transaction");
     }
-  }, [token, userId]);
-
-  // --------------------------------
-  // LOAD MONTHLY DATA
-  // --------------------------------
-  const loadMonthly = useCallback(async () => {
-    try {
-      const today = new Date();
-      const year = today.getFullYear();
-      const month = String(today.getMonth() + 1).padStart(2, "0");
-
-      const res = await api.get(`/transactions/monthly/${year}/${month}`);
-
-      setMonthlyData(res.data);
-    } catch (err) {
-      console.error("Monthly load error:", err);
-    }
-  }, [token, userId]);
-
-  // LOAD ON START
-  useEffect(() => {
-    loadTx();
-    loadMonthly();
-  }, [loadTx, loadMonthly]);
-
-  
-  // --------------------------------
-// MONTHLY SUMMARY VALUES
-// --------------------------------
-const now = new Date();
-const thisYear = now.getFullYear();
-const thisMonth = String(now.getMonth() + 1).padStart(2, "0");
-
-const monthlyTx = transactions.filter((t) => {
-  const txMonth = t.date.slice(0, 7); // YYYY-MM
-  return txMonth === `${thisYear}-${thisMonth}`;
-});
-
-const income = monthlyTx
-  .filter((t) => t.type === "Income")
-  .reduce((a, b) => a + b.amount, 0);
-
-const expense = monthlyTx
-  .filter((t) => t.type === "Expense")
-  .reduce((a, b) => a + b.amount, 0);
-  // --------------------------------
-  // FIX: Calculate TODAY Income 
-  // --------------------------------
-  const todayKey = new Date().toISOString().split("T")[0];
-
-  const todayIncome = transactions
-    .filter((t) => t.type === "Income" && t.date.startsWith(todayKey))
-    .reduce((a, b) => a + b.amount, 0);
-
-  const todayExpense = transactions
-    .filter((t) => t.type === "Expense" && t.date.startsWith(todayKey))
-    .reduce((a, b) => a + b.amount, 0);
+  };
 
   return (
-    <div className="dash-layout">
-      <Sidebar onLogout={onLogout} />
+    <>
+      <style>{`
+        .tx-table {
+          width: 100%;
+          border-collapse: collapse;
+          background: #ffffff;
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+        }
 
-      <div className="dash-main">
-        <h2>Welcome, {username}</h2>
+        .tx-table th {
+          background: #f8fafc;
+          padding: 14px;
+          text-align: left;
+          font-size: 14px;
+          font-weight: 600;
+          color: #334155;
+          border-bottom: 1px solid #e2e8f0;
+        }
 
-        {/* SUMMARY */}
-        <div className="summary-row">
-          <SummaryBox label="Income" value={income} type="income" />
-          <SummaryBox label="Expense" value={expense} type="expense" />
-        </div>
+        .tx-table td {
+          padding: 14px;
+          border-bottom: 1px solid #f1f5f9;
+          font-size: 16px;
+          color: #1e293b;
+        }
 
-        {/* BUTTONS */}
-        <div className="btn-row">
-          <button onClick={() => setIncomeModal(true)}>Add Income</button>
-          <button onClick={() => setExpenseModal(true)}>Add Expense</button>
-        </div>
+        .Income {
+          color: #059669;
+          font-weight: 600;
+        }
 
-        {/* MONTHLY GRAPH */}
-        <MonthlyChart data={monthlyData} />
+        .Expense {
+          color: #dc2626;
+          font-weight: 600;
+        }
 
-        {/* TODAY CHARTS */}
-        <div className="chart-row">
-          <IncomeChart income={todayIncome} />
-          <ExpenseChart expense={todayExpense} />
-          <SavingsChart income={income} expense={expense} />
-        </div>
+        .delete-btn {
+          background: #ef4444;
+          color: #fff;
+          border: none;
+          padding: 6px 10px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+          transition: 0.2s;
+        }
 
-        <h3 style={{ marginTop: 30 }}>Recent Transactions</h3>
-        <TransactionList
-         transactions={transactions}
-           onDelete={(id) => {
-            setTransactions((prev) => prev.filter((t) => t._id !== id));
-           loadMonthly();
-         }}
-/>
-      </div>
+        .delete-btn:hover {
+          background: #dc2626;
+        }
 
-      {/* INCOME MODAL */}
-      <Modal open={incomeModal} onClose={() => setIncomeModal(false)}>
-        <h2>Add Income</h2>
-        <AddTransactionForm
-          type="Income"
-          onAdd={() => {
-            setIncomeModal(false);
-            loadTx();
-            loadMonthly();
-          }}
-        />
-      </Modal>
+        .no-data {
+          text-align: center;
+          padding: 20px;
+          color: #64748b;
+        }
+      `}</style>
 
-      {/* EXPENSE MODAL */}
-      <Modal open={expenseModal} onClose={() => setExpenseModal(false)}>
-        <h2>Add Expense</h2>
-        <AddTransactionForm
-          type="Expense"
-          onAdd={() => {
-            setExpenseModal(false);
-            loadTx();
-            loadMonthly();
-          }}
-        />
-      </Modal>
-    </div>
+      <table className="tx-table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Amount</th>
+            <th>Type</th>
+            <th>Date</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {recent.length === 0 ? (
+            <tr>
+              <td colSpan="5" className="no-data">
+                No transactions this month
+              </td>
+            </tr>
+          ) : (
+            recent.map((t) => (
+              <tr key={t._id}>
+                <td>{t.title}</td>
+                <td>৳ {t.amount}</td>
+                <td className={t.type}>{t.type}</td>
+                <td>{t.date?.slice(0, 10)}</td>
+
+                <td>
+                  <button
+                    className="delete-btn"
+                    onClick={() => handleDelete(t._id)}
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </>
   );
 };
 
-export default Dashboard;
+export default TransactionList;
