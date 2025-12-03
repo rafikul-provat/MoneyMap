@@ -1,98 +1,164 @@
-import React from "react";
+// client/src/components/Dashboard/Dashboard.js
+import React, { useState, useEffect, useCallback } from "react";
+import Sidebar from "../Sidebar";
+import Modal from "../Modal";
+import SummaryBox from "./Summary/SummaryBox";
+import AddTransactionForm from "./Transactions/AddTransactionForm";
+import TransactionList from "./Transactions/TransactionList";
+import IncomeChart from "./Charts/IncomeChart";
+import ExpenseChart from "./Charts/ExpenseChart";
+import SavingsChart from "./Charts/SavingsChart";
+import MonthlyChart from "./Charts/MonthlyChart";
+import "./Dashboard.css";
+import api from "@/api/axiosConfig";
 
-const TransactionList = ({ transactions }) => {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = String(now.getMonth() + 1).padStart(2, "0");
+const Dashboard = ({ username, onLogout }) => {
+  const [transactions, setTransactions] = useState([]);
+  const [monthlyData, setMonthlyData] = useState({});
 
-  // Format to YYYY-MM
-  const thisMonthKey = `${currentYear}-${currentMonth}`;
+  const [incomeModal, setIncomeModal] = useState(false);
+  const [expenseModal, setExpenseModal] = useState(false);
 
-  // 🔥 Filter this month's transactions
-  const thisMonthTx = transactions.filter((t) =>
-    t.date?.startsWith(thisMonthKey)
-  );
+  const token = localStorage.getItem("token");
+  const userId = localStorage.getItem("userId"); // must be real ObjectId
 
-  // Show latest 5
-  const recent = thisMonthTx.slice(0, 5);
+  // --------------------------------
+  // LOAD ALL TRANSACTIONS
+  // --------------------------------
+  const loadTx = useCallback(async () => {
+    try {
+      const res = await api.get(`/transactions/${userId}`);
+
+
+
+      setTransactions(res.data);
+    } catch (err) {
+      console.error("Transaction load error:", err);
+    }
+  }, [token, userId]);
+
+  // --------------------------------
+  // LOAD MONTHLY DATA
+  // --------------------------------
+  const loadMonthly = useCallback(async () => {
+    try {
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, "0");
+
+      const res = await api.get(`/transactions/monthly/${year}/${month}`);
+
+      setMonthlyData(res.data);
+    } catch (err) {
+      console.error("Monthly load error:", err);
+    }
+  }, [token, userId]);
+
+  // LOAD ON START
+  useEffect(() => {
+    loadTx();
+    loadMonthly();
+  }, [loadTx, loadMonthly]);
+
+  
+  // --------------------------------
+// MONTHLY SUMMARY VALUES
+// --------------------------------
+const now = new Date();
+const thisYear = now.getFullYear();
+const thisMonth = String(now.getMonth() + 1).padStart(2, "0");
+
+const monthlyTx = transactions.filter((t) => {
+  const txMonth = t.date.slice(0, 7); // YYYY-MM
+  return txMonth === `${thisYear}-${thisMonth}`;
+});
+
+const income = monthlyTx
+  .filter((t) => t.type === "Income")
+  .reduce((a, b) => a + b.amount, 0);
+
+const expense = monthlyTx
+  .filter((t) => t.type === "Expense")
+  .reduce((a, b) => a + b.amount, 0);
+  // --------------------------------
+  // FIX: Calculate TODAY Income 
+  // --------------------------------
+  const todayKey = new Date().toISOString().split("T")[0];
+
+  const todayIncome = transactions
+    .filter((t) => t.type === "Income" && t.date.startsWith(todayKey))
+    .reduce((a, b) => a + b.amount, 0);
+
+  const todayExpense = transactions
+    .filter((t) => t.type === "Expense" && t.date.startsWith(todayKey))
+    .reduce((a, b) => a + b.amount, 0);
 
   return (
-    <>
-      <style>{`
-        .tx-table {
-          width: 100%;
-          border-collapse: collapse;
-          background: #ffffff;
-          border-radius: 12px;
-          overflow: hidden;
-          box-shadow: 0 4px 14px rgba(0,0,0,0.05);
-        }
+    <div className="dash-layout">
+      <Sidebar onLogout={onLogout} />
 
-        .tx-table th {
-          background: #f8fafc;
-          padding: 14px;
-          text-align: left;
-          font-size: 14px;
-          font-weight: 600;
-          color: #334155;
-          border-bottom: 1px solid #e2e8f0;
-        }
+      <div className="dash-main">
+        <h2>Welcome, {username}</h2>
 
-        .tx-table td {
-          padding: 14px;
-          border-bottom: 1px solid #f1f5f9;
-          font-size: 16px;
-          color: #1e293b;
-        }
+        {/* SUMMARY */}
+        <div className="summary-row">
+          <SummaryBox label="Income" value={income} type="income" />
+          <SummaryBox label="Expense" value={expense} type="expense" />
+        </div>
 
-        .Income {
-          color: #059669;
-          font-weight: 600;
-        }
+        {/* BUTTONS */}
+        <div className="btn-row">
+          <button onClick={() => setIncomeModal(true)}>Add Income</button>
+          <button onClick={() => setExpenseModal(true)}>Add Expense</button>
+        </div>
 
-        .Expense {
-          color: #dc2626;
-          font-weight: 600;
-        }
+        {/* MONTHLY GRAPH */}
+        <MonthlyChart data={monthlyData} />
 
-        .no-data {
-          text-align: center;
-          padding: 20px;
-          color: #64748b;
-        }
-      `}</style>
+        {/* TODAY CHARTS */}
+        <div className="chart-row">
+          <IncomeChart income={todayIncome} />
+          <ExpenseChart expense={todayExpense} />
+          <SavingsChart income={income} expense={expense} />
+        </div>
 
-      <table className="tx-table">
-        <thead>
-          <tr>
-            <th>Title</th>
-            <th>Amount</th>
-            <th>Type</th>
-            <th>Date</th>
-          </tr>
-        </thead>
+        <h3 style={{ marginTop: 30 }}>Recent Transactions</h3>
+        <TransactionList
+         transactions={transactions}
+           onDelete={(id) => {
+            setTransactions((prev) => prev.filter((t) => t._id !== id));
+           loadMonthly();
+         }}
+/>
+      </div>
 
-        <tbody>
-          {recent.length === 0 ? (
-            <tr>
-              <td colSpan="4" className="no-data">
-                No transactions this month
-              </td>
-            </tr>
-          ) : (
-            recent.map((t) => (
-              <tr key={t._id}>
-                <td>{t.title}</td>
-                <td>৳ {t.amount}</td>
-                <td className={t.type}>{t.type}</td>
-                <td>{t.date?.slice(0, 10)}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </>
+      {/* INCOME MODAL */}
+      <Modal open={incomeModal} onClose={() => setIncomeModal(false)}>
+        <h2>Add Income</h2>
+        <AddTransactionForm
+          type="Income"
+          onAdd={() => {
+            setIncomeModal(false);
+            loadTx();
+            loadMonthly();
+          }}
+        />
+      </Modal>
+
+      {/* EXPENSE MODAL */}
+      <Modal open={expenseModal} onClose={() => setExpenseModal(false)}>
+        <h2>Add Expense</h2>
+        <AddTransactionForm
+          type="Expense"
+          onAdd={() => {
+            setExpenseModal(false);
+            loadTx();
+            loadMonthly();
+          }}
+        />
+      </Modal>
+    </div>
   );
 };
 
-export default TransactionList;
+export default Dashboard;
