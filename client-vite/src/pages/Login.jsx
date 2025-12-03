@@ -4,32 +4,31 @@ import { useNavigate } from "react-router-dom";
 import bgImage from "../assets/auth-bg.jpg";
 import api from "../api/axiosConfig";
 
-
 const Login = ({ onLoginSuccess }) => {
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
   const handleLogin = async (e) => {
-  e.preventDefault();
-  setError("");
+    e.preventDefault();
+    setError("");
 
-  try {
-    const res = await api.post("/auth/login", { email, password });
+    try {
+      const res = await api.post("/auth/login", { email, password });
 
-    localStorage.setItem("token", res.data.token);
-    localStorage.setItem("userId", res.data.userId);
-    localStorage.setItem("username", res.data.username);
+      localStorage.setItem("token", res.data.token);
+      localStorage.setItem("userId", res.data.userId);
+      localStorage.setItem("username", res.data.username);
 
-    onLoginSuccess(res.data.username);
-    navigate("/dashboard");
-  } catch (err) {
-    setError("Invalid email or password");
-  }
-};
-
+      onLoginSuccess(res.data.username);
+      navigate("/dashboard");
+    } catch (err) {
+      setError("Invalid email or password");
+    }
+  };
 
   return (
     <div
@@ -82,6 +81,7 @@ const Login = ({ onLoginSuccess }) => {
         )}
 
         <form onSubmit={handleLogin}>
+          {/* Email */}
           <input
             type="email"
             placeholder="Email"
@@ -92,15 +92,34 @@ const Login = ({ onLoginSuccess }) => {
             required
           />
 
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            style={inputStyle}
-            className="input-anim"
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+          {/* Password with Eye Icon */}
+          <div style={{ position: "relative", width: "100%" }}>
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Password"
+              value={password}
+              style={inputStyle}
+              className="input-anim"
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+
+            <span
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                position: "absolute",
+                right: "14px",
+                top: "35%",
+                transform: "translateY(-50%)",
+                cursor: "pointer",
+                userSelect: "none",
+                fontSize: "24px",
+                color: "#555",
+              }}
+            >
+              {showPassword ? "🙊" : "🙈"}
+            </span>
+          </div>
 
           <button type="submit" style={btnStyle} className="btn-anim">
             Login
